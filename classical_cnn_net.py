@@ -12,7 +12,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-n_epochs = 3
+n_epochs = 10
 batch_size_train = 64
 batch_size_test = 1000
 learning_rate = 0.0009
@@ -110,6 +110,7 @@ def test():
   network.eval()
   test_loss = 0
   correct = 0
+  confusion = np.zeros((10, 10), dtype='i4')
   with torch.no_grad():
     for batch_idx in range(157):
       if batch_idx < 156:
@@ -120,8 +121,12 @@ def test():
         target = labels[69984:70000].values
       data = torch.from_numpy(data)
       target = torch.from_numpy(target)
-    #for data, target in test_loader:
+      #for data, target in test_loader:
       output = network(data.float())
+      for i in range(target.shape[0]):
+        subsetIndex = np.argmax(output.numpy()[i])
+        targetIndex = target[i].numpy()
+        confusion[subsetIndex, targetIndex] += 1
       test_loss += F.nll_loss(output, target, size_average=False).item()
       pred = output.data.max(1, keepdim=True)[1]
       correct += pred.eq(target.data.view_as(pred)).sum()
@@ -130,13 +135,18 @@ def test():
   print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
     test_loss, correct, 10000,
     100. * correct /10000))
+  return confusion
 
 network = network.float()
 
 test()
+confusion = []
 for epoch in range(1, n_epochs + 1):
   train(epoch)
-  test()
+  confusion = test()
+
+newFile = open('CNN Data.txt', 'w')
+newFile.write(str(confusion))
 
 fig = plt.figure()
 plt.plot(train_counter, train_losses, color='blue')
