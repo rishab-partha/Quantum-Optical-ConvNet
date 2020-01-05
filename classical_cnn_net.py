@@ -140,12 +140,14 @@ def test():
 network = network.float()
 
 test()
-confusion = []
+confusion = np.zeros((10, 10), dtype='i4')
 for epoch in range(1, n_epochs + 1):
   train(epoch)
   confusion = test()
 
-newFile = open('CNN Data.txt', 'w')
+print(confusion)
+
+newFile = open('Data/CNN Data.txt', 'w')
 newFile.write(str(confusion))
 
 fig = plt.figure()
