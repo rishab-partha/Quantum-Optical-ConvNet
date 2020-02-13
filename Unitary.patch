@@ -1,0 +1,95 @@
+--- /home/michael/python_projects/optical_nn/optical_nn.py
++++ /home/michael/python_projects/optical_nn/optical_nn.py
+@@ -31,7 +31,7 @@
+     @classmethod
+     def truncated(cls, n_layers):
+         return partial(cls, n_layers=n_layers)
+-    def __init__(self, D, sigma_PS=0, sigma_BS=0, FFT=False, use_psi=True, n_layers=None, approx_sigma_bs=False):
++    def __init__(self, D, sigma_PS=0, sigma_BS=0, FFT=False, use_psi=True, n_layers=None):
+         super().__init__()
+         self.D = D
+         if n_layers is None:
+@@ -41,7 +41,6 @@
+         self.use_psi = use_psi
+         self.sigma_PS = sigma_PS
+         self.sigma_BS = sigma_BS
+-        self.approx_sigma_bs = approx_sigma_bs
+         self.init_params()
+     def init_params(self):
+         D = self.D
+@@ -55,27 +54,6 @@
+         
+         sin_A = th.rand(n_layer_A, n_MZ_A) 
+         sin_B = th.rand(n_layer_B, n_MZ_B) 
+-
+-        if False:
+-            Y_A = 2 * np.abs(np.arange(n_layer_A) * 2 - D/2) - 1
+-            Y_B = 2 * np.abs(np.arange(n_layer_B) * 2 - D/2) - 1
+-            X_A = 2 * np.abs(np.arange(n_MZ_A) * 2 - D/2) - 1
+-            X_B = 2 * np.abs(np.arange(n_MZ_B) * 2 - D/2) - 1
+-            
+-            XX_A, YY_A = np.meshgrid(X_A, Y_A)
+-            beta_A = D - np.maximum(XX_A, YY_A)
+-            
+-            alpha_A = np.ones_like(beta_A)
+-            sin_A = np.random.beta(alpha_A, beta_A)
+-
+-            XX_B, YY_B = np.meshgrid(X_B, Y_B)
+-            beta_B = D - np.maximum(XX_B, YY_B)
+-            
+-            alpha_B = np.ones_like(beta_B)
+-            sin_B = np.random.beta(alpha_B, beta_B)
+-
+-            sin_A = th.tensor(sin_A).float()
+-            sin_B = th.tensor(sin_B).float()
+ 
+         self.phi_A = Parameter(th.rand(n_layer_A, n_MZ_A) * 1 * pi)
+         self.phi_B = Parameter(th.rand(n_layer_B, n_MZ_B) * 1 * pi)
+@@ -122,36 +100,25 @@
+             noisy_angles.append(self.psi)
+ 
+         return noisy_angles
+-    def get_UV(self):
+-        # If simulating PS noise
++    def forward(self, X):
+         if self.sigma_PS > 0:
+             theta_A, phi_A, theta_B, phi_B, psi = self.noisy_weights()
+         else:
+             theta_A, phi_A, theta_B, phi_B, psi = self.angles
+ 
+-        # If simulating BS noise
++        UV_A = UV_MZ(self.D, theta_A, phi_A, 'A')
++        UV_B = UV_MZ(self.D, theta_B, phi_B, 'B')
++
+         if self.sigma_BS > 0:
++
+             self.get_BS_noise()
+ 
+-            # If approximating BS noise
+-            if self.approx_sigma_bs:
+-                UV_A = UV_MZ(self.D, theta_A, phi_A, 'A')
+-                UV_B = UV_MZ(self.D, theta_B, phi_B, 'B')
+-                d_UV_A = UV_MZ(self.D, theta_A + pi, phi_A + pi, 'A', BS_noise=self.noise_A)
+-                d_UV_B = UV_MZ(self.D, theta_B + pi, phi_B + pi, 'B', BS_noise=self.noise_B)
+-                
+-                UV_A = [UV + 2**0.5 * self.sigma_BS * dUV for (UV, dUV) in zip(UV_A, d_UV_A)]
+-                UV_B = [UV + 2**0.5 * self.sigma_BS * dUV for (UV, dUV) in zip(UV_B, d_UV_B)]
+-            else:
+-                UV_A = UV_MZ(self.D, theta_A, phi_A, 'A', BS_noise=[self.sigma_BS * x for x in self.noise_A], new=True)
+-                UV_B = UV_MZ(self.D, theta_B, phi_B, 'B', BS_noise=[self.sigma_BS * x for x in self.noise_B], new=True)
+-        else:
+-            UV_A = UV_MZ(self.D, theta_A, phi_A, 'A')
+-            UV_B = UV_MZ(self.D, theta_B, phi_B, 'B')
+-
+-        return UV_A, UV_B, psi
+-    def forward(self, X):
+-        UV_A, UV_B, psi = self.get_UV()
++            d_UV_A = UV_MZ(self.D, theta_A + pi, phi_A + pi, 'A', BS_noise=self.noise_A)
++            d_UV_B = UV_MZ(self.D, theta_B + pi, phi_B + pi, 'B', BS_noise=self.noise_B)
++            
++            UV_A = [UV + 2**0.5 * self.sigma_BS * dUV for (UV, dUV) in zip(UV_A, d_UV_A)]
++            UV_B = [UV + 2**0.5 * self.sigma_BS * dUV for (UV, dUV) in zip(UV_B, d_UV_B)]
++        
+         perm_A = perm_full(self.D, 'A')
+         perm_B = perm_full(self.D, 'B')
+ 
