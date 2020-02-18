@@ -1126,10 +1126,13 @@ class AveragePooling(nn.Module):
         assert D % 2 == 0
         X = Z[:, :D//2]
         Y = Z[:, D//2:]
+        b = list(X.shape)[0]
         X = th.unsqueeze(X, 0)
         Y = th.unsqueeze(Y, 0)
-        return th.unsqueeze(th.squeeze(th.cat((F.avg_pool1d(X, kernel_size = self.kernel_size, stride = self.stride), F.avg_pool1d(Y, kernel_size = self.kernel_size, stride = self.stride)), 2)), 0)
-
+        A = th.squeeze(th.cat((F.avg_pool1d(X, kernel_size = self.kernel_size, stride = self.stride), F.avg_pool1d(Y, kernel_size = self.kernel_size, stride = self.stride)), 2))
+        if b == 1:
+            A = th.unsqueeze(A, 0)
+        return A
 class MaxPooling(nn.Module):
     def __init__(self, kernel_size, stride = None):
         super().__init__()
@@ -1144,10 +1147,13 @@ class MaxPooling(nn.Module):
         assert D % 2 == 0
         X = Z[:, :D//2]
         Y = Z[:, D//2:]
+        b = list(X.shape)[0]
         X = th.unsqueeze(X, 0)
         Y = th.unsqueeze(Y, 0)
-        return th.unsqueeze(th.squeeze(th.cat((F.max_pool1d(X, kernel_size = self.kernel_size, stride = self.stride), F.max_pool1d(Y, kernel_size = self.kernel_size, stride = self.stride)), 2)), 0)
-    
+        A = th.squeeze(th.cat((F.max_pool1d(X, kernel_size = self.kernel_size, stride = self.stride), F.max_pool1d(Y, kernel_size = self.kernel_size, stride = self.stride)), 2))
+        if b == 1:
+            A = th.unsqueeze(A, 0)
+        return A
 """ Nonlinearities """
 class ModNonlinearity(nn.Module):
     def __init__(self, f=None):

@@ -24,7 +24,7 @@ def train_complex(f=F_COMPLEX_TRAIN, n_h=[256, 256]):
     train_params['batch_size'] = 100
 
     optim_params = {}
-    optim_params['lr'] = 1.0e-2
+    optim_params['lr'] = 1.0e-3
     optim_params['momentum'] = .9
 
     net = mnist_complex(hidden_units=n_h)

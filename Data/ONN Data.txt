@@ -101,4 +101,20 @@ QONN(ComplexNet with sin^2(x) Activation Function):
  [  10    6    2    8   25    6    3   18   12  919]]
 
 Accuracy: 0.9193999767303467
+
+QOCNN with one Conv and Pooling Layer:
+
+[[ 972    0    0    1    0    2    1    2    2    0]
+ [   0 1124    2    2    0    3    2    0    2    0]
+ [   2    3 1002    5    2    0    5    5    8    0]
+ [   1    0    3  987    0   11    0    1    4    3]
+ [   1    0    7    1  952    0    2    3    2   14]
+ [   4    0    1    8    1  867    5    2    2    2]
+ [   5    2    0    0    2    5  941    1    2    0]
+ [   1    8   11    3    0    0    0  992    4    9]
+ [   5    0    2    7    5    2    3    4  944    2]
+ [   5    3    2    8   10   10    0    8    5  958]]
+
+ Accuracy: 0.9739000201225281
+ 
 Rest are only needed for simulation of lossy fidelity. These are the principal models and advancements.
