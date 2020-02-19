@@ -13,7 +13,7 @@ from default_params import *
 from sklearn.metrics import confusion_matrix
 TEST_SIZE = 10_000
 BATCH_SIZE = 100
-USE_CUDA = True
+USE_CUDA = False
 if USE_CUDA:
     print('Using CUDA')
     DEVICE = th.device('cuda')
@@ -77,7 +77,9 @@ def mnist_ONN(unitary=Unitary, num_in=N_IN, num_out=10, num_h1=256, num_h2=256, 
 def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVICE, sigma=0, T0=0.2):
     f = SineModulator(T=T0)
     layers = [
-        ComplexLinear(num_in, hidden_units[0]),
+        ComplexConvolution(392, 3, 2),
+        MaxPooling(2, stride = 1),
+        ComplexLinear(391, hidden_units[0]),
         ModNonlinearity(f=f)
             ]
     for nh_, nh in zip(hidden_units[:-1], hidden_units[1:]):
