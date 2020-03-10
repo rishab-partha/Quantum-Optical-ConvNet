@@ -9,14 +9,13 @@ import numpy as np
 import glob
 import cv2
 import warnings
-import mnist
 
 warnings.filterwarnings("ignore")
 
 n_epochs = 10
 batch_size_train = 64
 batch_size_test = 1000
-learning_rate = 0.0009
+learning_rate = 0.0004
 momentum = 0.9
 log_interval = 10
 
@@ -45,12 +44,11 @@ for i in range(6):
     plt.title("Ground Truth: {}".format(labels[i]))
     plt.xticks([])
     plt.yticks([])
-
 plt.show()
 '''
 
 print("Training...")
-
+print(datum.shape)
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -104,6 +102,7 @@ def train(epoch):
         train_losses.append(loss.item())
         train_counter.append(
             (batch_idx*64) + ((epoch-1)*60000))
+        #torch.save(network.state_dict(), '/results/model.pth')
         #torch.save(optimizer.state_dict(), '/results/optimizer.pth')
 
 def test():
@@ -140,15 +139,11 @@ def test():
 network = network.float()
 
 test()
-optim_params = {}
-optim_params['lr'] = 0.0005
-optim_params['momentum'] = .9
 confusion = np.zeros((10, 10), dtype='i4')
-mnist.train(network, n_epochs = 5, log_interval = 100, optim_params = optim_params, batch_size = 100)
-optim_params['lr'] = 0.0001
-mnist.train(network, n_epochs = 5, log_interval = 100, optim_params = optim_params, batch_size = 100)
-print(mnist.get_acc(network))
-torch.save(network.state_dict(), 'model.pth')
+for epoch in range(1, n_epochs + 1):
+  train(epoch)
+  confusion = test()
+
 print(confusion)
 
 newFile = open('Data/CNN Data.txt', 'w')
@@ -163,8 +158,7 @@ plt.ylabel('negative log likelihood loss')
 
 plt.show()
 
-with torch.no_grad():
-  output = network(torch.from_numpy(datum[i].reshape((1, 1, 28,28))))
+
 
 print("Done!")
 
@@ -172,9 +166,11 @@ fig = plt.figure()
 for i in range(6):
   plt.subplot(2,3,i+1)
   plt.tight_layout()
-  plt.imshow(datum[i].reshape((1, 1, 28, 28)), cmap='gray', interpolation='none')
+  plt.imshow(datum[i].reshape((28, 28)), cmap='gray', interpolation='none')
+  with torch.no_grad():
+    output = network(torch.from_numpy(datum[i].reshape((1, 1, 28,28))).float())
   plt.title("Prediction: {}".format(
-    output.data.max(1, keepdim=True)[1][i].item()))
+    output.data.max(1, keepdim=True)[1].item()))
   plt.xticks([])
   plt.yticks([])
 plt.show()
