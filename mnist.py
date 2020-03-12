@@ -81,11 +81,12 @@ def mnist_ONN(unitary=Unitary, num_in=N_IN, num_out=10, num_h1=256, num_h2=256, 
         ])
     net = NoisySequential(*layers).to(device)
     return net
-def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVICE, sigma=0, T0=0.03):
-    print("hello")
-    f = ShiftedSoftplus(T=T0)
+def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVICE, sigma=0, T0=0.2):
+    f = SineModulator(T=T0)
     layers = [
-        ComplexLinear(392, hidden_units[0]),
+        ComplexConvolution(392, filtersize = 3, stepsize = 1),
+        MaxPooling(kernel_size = 2, stride = 1),
+        ComplexLinear(391, hidden_units[0]),
         ModNonlinearity(f=f)
             ]
     for nh_, nh in zip(hidden_units[:-1], hidden_units[1:]):
@@ -121,6 +122,7 @@ def train(model, n_epochs, log_interval, optim_params, batch_size=10, criterion=
     t0 = time()
     for epoch in range(n_epochs):
         for batch_idx, (data, target) in enumerate(loader):
+            data = data.view(-1, 28**2)
             data = data.to(device)
             target = target.to(device)
             out = model(data)
@@ -145,90 +147,12 @@ def get_acc(model, device=DEVICE):
     confusion = None
     with th.no_grad():
         for data, target in mnist_loader(train=False, batch_size=TEST_SIZE):
+            data = data.view(-1, 28**2)
             data, target = data.to(device), target.to(device)
             out = model(data)
             pred = out.argmax(1)
             acc = (pred == target).float().mean()
             confusion = confusion_matrix(target.cpu(), pred.cpu())
-    Y_pred = model(data)
-    out = Y_pred.data.max(1, keepdim=True)[1]
-    Y_pred = torch.exp(Y_pred)
-    Y_pred.detach()
-    Y_real = torch.zeros((10000, 10), requires_grad = False)
-    Y_pred = Y_pred.detach().numpy()
-    for i in range(10000):
-        Y_real[i][target[i]] = 1
-    # Plot linewidth.
-    Y_real = Y_real.numpy()
-    lw = 2
-
-    # Compute ROC curve and ROC area for each class
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-    for i in range(10):
-        temp = []
-        fpr[i], tpr[i], _ = roc_curve(Y_real[:, i], Y_pred[:, i])
-        roc_auc[i] = auc(fpr[i], tpr[i])
-    print("hello")
-    # Compute micro-average ROC curve and ROC area
-    fpr["micro"], tpr["micro"], _ = roc_curve(Y_real.ravel(), Y_pred.ravel())
-    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-
-    # Compute macro-average ROC curve and ROC area
-
-    # First aggregate all false positive rates
-    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(10)]))
-
-    # Then interpolate all ROC curves at this points
-    mean_tpr = np.zeros_like(all_fpr)
-    for i in range(10):
-        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
-
-    # Finally average it and compute AUC
-    mean_tpr /= 10
-
-    fpr["macro"] = all_fpr
-    tpr["macro"] = mean_tpr
-    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
-
-    # Plot micro/macro ROC curves
-    # plt.figure(1)
-    # plt.plot(fpr["micro"], tpr["micro"],
-    #         label='micro-average ROC curve (area = {0:0.2f})'
-    #             ''.format(roc_auc["micro"]),
-    #         color='deeppink', linestyle=':', linewidth=4)
-
-    # plt.plot(fpr["macro"], tpr["macro"],
-    #         label='macro-average ROC curve (area = {0:0.2f})'
-    #             ''.format(roc_auc["macro"]),
-    #         color='navy', linestyle=':', linewidth=4)
-
-    # plt.plot([0, 1], [0, 1], 'k--', lw=lw)
-    # plt.xlim([0.0, 1.0])
-    # plt.ylim([0.0, 1.05])
-    # plt.xlabel('False Positive Rate')
-    # plt.ylabel('True Positive Rate')
-    # plt.title('Receiver operating characteristic for multi-class')
-    # plt.legend(loc="lower right")
-    # plt.show()
-
-    # Plot class ROC curves
-    plt.figure(2)
-    colors = cycle(['aqua', 'darkorange', 'cornflowerblue','deeppink','navy','yellow','purple','gray','red','green','brown','blue'])
-    for i, color in zip(range(10), colors):
-        plt.plot(fpr[i], tpr[i], color=color, lw=lw,
-                label='ROC curve of class {0} (area = {1:0.6f})'
-                ''.format(i, roc_auc[i]))
-
-    plt.plot([0, 1], [0, 1], 'k--', lw=lw)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('')
-    plt.legend(loc="lower right")
-    plt.show()
     return acc.item(), confusion
 
 class StackedFFTUnitary(nn.Sequential):
