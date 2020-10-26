@@ -1203,7 +1203,7 @@ class SineModulator(nn.Module):
         super().__init__()
         self.T = T
     def forward(self, X):
-        return X*(th.sin(self.T*(X)))
+        return X* (th.sin(self.T*(X)))
 """ Other """
 class NoisySequential(nn.Sequential):
     def __init__(self, *layers):

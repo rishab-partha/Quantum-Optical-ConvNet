@@ -1,14 +1,25 @@
 import numpy as np
+print(1)
 import torch as th
+print(2)
 import matplotlib.pylab as plt
+print(3)
 from optical_nn import *
+print(4)
 import complex_torch_var as ct
+print(5)
 from mnist import *
+print(6)
 import os
+print(7)
 from time import time
+print(8)
 from functools import partial
+print(9)
 from glob import glob
+print(10)
 from default_params import *
+print(11)
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -165,7 +176,7 @@ def load_trunc_grid(f=os.path.join(DIR_TRAINED_MODELS, 'truncated_grid.pth')):
     return net.to(DEVICE)
 
 if __name__ == '__main__':
-    # train_complex()
+    #train_complex()
     net = load_complex()
     
     for data, target in mnist_loader(train=False, batch_size=100, shuffle=False):
