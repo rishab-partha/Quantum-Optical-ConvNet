@@ -1,11 +1,3 @@
-'''
-Taken from the public codebase https://github.com/mike-fang/imprecise_optical_neural_network.
-
-Serves as a functionality base for the rest of the code in terms of complex arithmetic/matrices.
-
-@version 3.8.2021
-'''
-
 import torch as th
 import torch.nn as nn
 import numpy as np

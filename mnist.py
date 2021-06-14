@@ -1,10 +1,3 @@
-'''
-This file defines the models and the MNIST dataset before creating functionalities to train. The majority of this file is from the public
-codebase at https://github.com/mike-fang/imprecise_optical_neural_network. The function mnist_complex has been significantly modified by me.
-
-@version 3.8.2021
-'''
-
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -25,7 +18,6 @@ import matplotlib.pyplot as plt
 from itertools import cycle
 from sklearn.metrics import roc_curve, auc
 import math
-
 TEST_SIZE = 10_000
 BATCH_SIZE = 100
 USE_CUDA = False
@@ -35,7 +27,6 @@ if USE_CUDA:
 else:
     print('Using CPU')
     DEVICE = th.device('cpu')
-
 
 # Define loader
 def mnist_loader(train=True, batch_size=BATCH_SIZE, shuffle=True):
@@ -60,6 +51,69 @@ X0 = data[82][None, :]
 N_IN = 28**2//2
 
 
+def mnist_ONN(unitary=Unitary, num_in=N_IN, num_out=10, num_h1=256, num_h2=256, hidden_units=[256, 256], device=DEVICE, sigma_PS=0, sigma_BS=0, T0=0.03):
+    """
+    Creates a MLP for training on MNIST
+    args:
+        unitary: The type of unitary layer used (GridUnitary, FFTUnitary, etc.)
+        num_h1: The number of hidden units in the first layer
+        num_h2: The number of hidden units in the second layer
+        device: The device to be used by torch. 'cpu' or 'cuda'
+        sigma_PS: The stdev on uncertainty added to phaseshifter
+        sigma_BS: The stdev on uncertainty added to beamsplitter
+    returns:
+        A th.nn.Sequential module with above features
+    """
+    f = ShiftedSoftplus(T=T0)
+    layers = [
+        Linear(num_in, hidden_units[0], sigma_PS=sigma_PS, sigma_BS=sigma_BS, UNet=unitary),
+        ModNonlinearity(f=f)
+            ]
+    for nh_, nh in zip(hidden_units[:-1], hidden_units[1:]):
+        layers.extend([
+            Linear(nh_, nh, sigma_PS=sigma_PS, sigma_BS=sigma_BS, UNet=unitary),
+            ModNonlinearity(f=f),
+                ])
+    layers.extend([
+        Linear(hidden_units[-1], num_out, sigma_PS=sigma_PS, sigma_BS=sigma_BS, UNet=unitary),
+        ComplexNorm(),
+        nn.LogSoftmax(dim=1)
+        ])
+    net = NoisySequential(*layers).to(device)
+    return net
+def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVICE, sigma=0, T0=0.2):
+    f = SineModulator(T=T0)
+    layers = [
+        ComplexConvolution(392, filtersize = 3, stepsize = 1),
+        MaxPooling(kernel_size = 2, stride = 1),
+        ComplexLinear(391, hidden_units[0]),
+        ModNonlinearity(f=f)
+            ]
+    for nh_, nh in zip(hidden_units[:-1], hidden_units[1:]):
+        layers.extend([
+            ComplexLinear(nh_, nh),
+            ModNonlinearity(f=f),
+                ])
+    layers.extend([
+        ComplexLinear(hidden_units[-1], num_out),
+        ComplexNorm(),
+        nn.LogSoftmax(dim=1)
+        ])
+    net = nn.Sequential(*layers).to(device)
+    def to_grid_net(rand_S=True):
+        grid_net = mnist_ONN(num_in=num_in, num_out=num_out, hidden_units=hidden_units)
+        for lc, lo in zip(net, grid_net):
+            if isinstance(lc, ComplexLinear):
+                assert isinstance(lo, Linear)
+                assert lc.weight.shape == (2*lo.D_out, 2*lo.D_in)
+                M = lc.weight.to('cpu').data
+                t0 = time()
+                print(f'Converting weights of size {M.shape}')
+                lo.emul_M(M, rand_S=rand_S)
+                print(time()-t0)
+        return grid_net
+    net.to_grid_net = to_grid_net
+    return net
 def train(model, n_epochs, log_interval, optim_params, batch_size=10, criterion=nn.NLLLoss(), device=DEVICE, epoch_callback=None, log_callback=None):
     loader = mnist_loader(train=True, batch_size=batch_size)
     optimizer = optim.SGD(model.parameters(), **optim_params)
@@ -165,86 +219,6 @@ def mnist_grid_truncated(num_in=N_IN, num_out=10, hidden_units=[256, 256], devic
     net = NoisySequential(*layers).to(device)
     return net
 
-def mnist_ONN(unitary=Unitary, num_in=N_IN, num_out=10, num_h1=256, num_h2=256, hidden_units=[256, 256], device=DEVICE, sigma_PS=0, sigma_BS=0, T0=0.03):
-    """
-    Creates a MLP for training on MNIST
-    args:
-        unitary: The type of unitary layer used (GridUnitary, FFTUnitary, etc.)
-        num_h1: The number of hidden units in the first layer
-        num_h2: The number of hidden units in the second layer
-        device: The device to be used by torch. 'cpu' or 'cuda'
-        sigma_PS: The stdev on uncertainty added to phaseshifter
-        sigma_BS: The stdev on uncertainty added to beamsplitter
-    returns:
-        A th.nn.Sequential module with above features
-    """
-    f = ShiftedSoftplus(T=T0)
-    layers = [
-        Linear(num_in, hidden_units[0], sigma_PS=sigma_PS, sigma_BS=sigma_BS, UNet=unitary),
-        ModNonlinearity(f=f)
-            ]
-    for nh_, nh in zip(hidden_units[:-1], hidden_units[1:]):
-        layers.extend([
-            Linear(nh_, nh, sigma_PS=sigma_PS, sigma_BS=sigma_BS, UNet=unitary),
-            ModNonlinearity(f=f),
-                ])
-    layers.extend([
-        Linear(hidden_units[-1], num_out, sigma_PS=sigma_PS, sigma_BS=sigma_BS, UNet=unitary),
-        ComplexNorm(),
-        nn.LogSoftmax(dim=1)
-        ])
-    net = NoisySequential(*layers).to(device)
-    return net
-
-'''
-Creates a QOCNN for training on MNIST.
-
-Inputs:
-    num_in: the input dimension 
-    num_out: the output dimension
-    hidden_units: the number of hidden units in each linear layer
-    device: the device on which the network is being run
-    sigma: the amount of noise
-    T0: the modulation created by the nonlinearity
-
-Outputs:
-    A QOCNN satisfying the above properties
-'''
-def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVICE, sigma=0, T0=0.2):
-    f = SineModulator(T=T0)
-    layers = [
-        ComplexConvolution(392, filtersize = 3, stepsize = 1),
-        MaxPooling(kernel_size = 2, stride = 1),
-        ComplexLinear(391, hidden_units[0]),
-        ModNonlinearity(f=f)
-            ]
-    for nh_, nh in zip(hidden_units[:-1], hidden_units[1:]):
-        layers.extend([
-            ComplexLinear(nh_, nh),
-            ModNonlinearity(f=f),
-                ])
-    layers.extend([
-        ComplexLinear(hidden_units[-1], num_out),
-        ComplexNorm(),
-        nn.LogSoftmax(dim=1)
-        ])
-    net = nn.Sequential(*layers).to(device)
-
-    '''def to_grid_net(rand_S=True):
-        grid_net = mnist_ONN(num_in=num_in, num_out=num_out, hidden_units=hidden_units)
-        for lc, lo in zip(net, grid_net):
-            if isinstance(lc, ComplexLinear):
-                assert isinstance(lo, Linear)
-                assert lc.weight.shape == (2*lo.D_out, 2*lo.D_in)
-                M = lc.weight.to('cpu').data
-                t0 = time()
-                print(f'Converting weights of size {M.shape}')
-                lo.emul_M(M, rand_S=rand_S)
-                print(time()-t0)
-        return grid_net'''
-
-    # net.to_grid_net = to_grid_net
-    return net
 
 if __name__ == '__main__':
 
@@ -260,29 +234,27 @@ if __name__ == '__main__':
     optim_params['lr'] = LR_FFT
     optim_params['momentum'] = .9
 
-    # net = mnist_grid_truncated()
-    # print(net(X0))
-    # train(net, **train_params, optim_params=optim_params)
-    # optim_params['lr'] /= 5
-    # train(net, **train_params, optim_params=optim_params)
-    # th.save(net, os.path.join(DIR_TRAINED_MODELS, 'truncated_grid.pth'))
-    # assert False
-    # net = mnist_stacked_fft(32)
-    # train(net, **train_params, optim_params=optim_params)
-    # optim_params['lr'] /= 5
-    # train(net, **train_params, optim_params=optim_params)
-    # th.save(net, os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_1.pth'))
-    # print(get_acc(net))
-    net_loaded = mnist_ONN()
-    net_loaded.load_state_dict(th.load(os.path.join(DIR_TRAINED_MODELS, 'grid_net.pth')))
-    print("Loaded Model")
+    net = mnist_ONN(unitary = FFTUnitary)
+    print(net(X0))
+    train(net, **train_params, optim_params=optim_params)
+    optim_params['lr'] /= 5
+    train(net, **train_params, optim_params=optim_params)
+    th.save(net, os.path.join(DIR_TRAINED_MODELS, 'truncated_grid.pth'))
+    assert False
+    net = mnist_stacked_fft(1)
+    train(net, **train_params, optim_params=optim_params)
+    optim_params['lr'] /= 5
+    train(net, **train_params, optim_params=optim_params)
+    th.save(net, os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_1.pth'))
+    print(get_acc(net))
+    net_loaded = th.load(os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_1.pth'))
     print(get_acc(net_loaded))
 
-    # assert False
-    # train(net, **train_params, optim_params=optim_params)
-    # optim_params['lr'] /= 5
-    # train(net, **train_params, optim_params=optim_params)
-    # th.save(net, os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_32.pth'))
-    # print(get_acc(net))
-    # net_loaded = th.load(os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_32.pth'))
-    # print(get_acc(net_loaded))
+    assert False
+    train(net, **train_params, optim_params=optim_params)
+    optim_params['lr'] /= 5
+    train(net, **train_params, optim_params=optim_params)
+    th.save(net, os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_32.pth'))
+    print(get_acc(net))
+    net_loaded = th.load(os.path.join(DIR_TRAINED_MODELS, 'stacked_fft_32.pth'))
+    print(get_acc(net_loaded))

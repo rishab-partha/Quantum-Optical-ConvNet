@@ -20,13 +20,13 @@ momentum = 0.9
 log_interval = 10
 
 random_seed = 1
-torch.backends.cudnn.enabled = True
+torch.backends.cudnn.enabled = False
 
 print("Importing data...")
 
 img_frame = pd.read_csv('data.csv')
 labels = img_frame['names']
-datum = img_frame.loc[:,'col_0':].to_numpy()
+datum = img_frame.loc[:,'col_0':].as_matrix()
 
 print("Shuffling Data...")
 
@@ -80,8 +80,6 @@ test_counter = [i*60000 for i in range(n_epochs + 1)]
 
 def train(epoch):
     network.train()
-
-    # Split Batch Sizes
     for batch_idx in range(938):
       if batch_idx < 937:
         data = datum[batch_idx*64:batch_idx*64+64].reshape(64, 1, 28, 28)
@@ -92,15 +90,11 @@ def train(epoch):
       data = torch.from_numpy(data)
       target = torch.from_numpy(target)
     #for batch_idx, (data, target) in enumerate(train_loader):
-
-      # Optimize the Network
       optimizer.zero_grad()
       output = network(data.float())
       loss = F.nll_loss(output, target)
       loss.backward()
       optimizer.step()
-
-      # Print batch interval
       if batch_idx % log_interval == 0:
         print('Train Epoch: {} [{}/{} ({:.2f}%)]\tLoss: {:.6f}'.format(
             epoch, batch_idx * len(data), 60000,
@@ -116,10 +110,7 @@ def test():
   test_loss = 0
   correct = 0
   confusion = np.zeros((10, 10), dtype='i4')
-
   with torch.no_grad():
-
-    # Batch the input
     for batch_idx in range(157):
       if batch_idx < 156:
         data = datum[batch_idx*64+60000:batch_idx*64+60064].reshape(64, 1, 28,28)
@@ -127,14 +118,10 @@ def test():
       else:
         data = datum[69984:70000].reshape(16, 1, 28,28)
         target = labels[69984:70000].values
-
-      # Format/Evaluate the Input
       data = torch.from_numpy(data)
       target = torch.from_numpy(target)
       #for data, target in test_loader:
       output = network(data.float())
-
-      # Generate Metrics
       for i in range(target.shape[0]):
         subsetIndex = np.argmax(output.numpy()[i])
         targetIndex = target[i].numpy()
@@ -162,7 +149,6 @@ print(confusion)
 newFile = open('Data/CNN Data.txt', 'w')
 newFile.write(str(confusion))
 
-# Make plots
 fig = plt.figure()
 plt.plot(train_counter, train_losses, color='blue')
 plt.scatter(test_counter, test_losses, color='red')
