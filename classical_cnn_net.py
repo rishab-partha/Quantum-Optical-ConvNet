@@ -27,7 +27,7 @@ print("Importing data...")
 
 img_frame = pd.read_csv('data.csv')
 labels = img_frame['names']
-datum = img_frame.loc[:,'col_0':].as_matrix()
+datum = img_frame.loc[:,'col_0':].to_numpy()
 
 print("Shuffling Data...")
 

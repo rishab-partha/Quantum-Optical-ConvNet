@@ -1,3 +1,9 @@
+'''
+Functionalities for unitary decomposition/singular value decomposition (SVD). Taken from https://github.com/mike-fang/imprecise_optical_neural_network.
+
+@version 3.8.2021
+'''
+
 import numpy as np
 from numpy.linalg import svd
 from scipy.stats import unitary_group
