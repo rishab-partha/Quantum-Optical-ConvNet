@@ -1,3 +1,12 @@
+'''
+Describes the different components of the neural networks. Based on the public codebase at https://github.com/mike-fang/imprecise_optical_neural_network.
+
+The ComplexConvolution, Pooling, and SineModulator is my code.
+
+@version 3.8.2021
+'''
+
+
 import numpy as np
 import torch as th
 import torch.nn as nn
@@ -231,6 +240,13 @@ def layer_mult_full(X, UV, perm):
     D = D2//2
 
     U_real, V_real, U_imag, V_imag = UV
+
+    device = th.device('cuda' if X.is_cuda  else 'cpu')
+    U_real = U_real.to(device)
+    V_real = V_real.to(device)
+    U_imag = U_imag.to(device)
+    V_imag = V_imag.to(device)
+
     X_re = X[:, :D]
     X_im = X[:, D:]
 
@@ -446,6 +462,13 @@ class Unitary(nn.Module):
             X_im = X[:, self.D:]
             U_real = th.cos(psi)
             U_imag = th.sin(psi)
+
+            device = th.device('cuda' if X.is_cuda  else 'cpu')
+            U_real = U_real.to(device)
+            X_re = X_re.to(device)
+            U_imag = U_imag.to(device)
+            X_im = X_im.to(device)
+
             Y_real = (U_real*X_re - U_imag*X_im)
             Y_imag = (U_real*X_im + U_imag*X_re)
 
@@ -646,7 +669,7 @@ class HybridUnitary(Unitary):
         perm_A = perm_full(self.D, 'A')
         perm_B = perm_full(self.D, 'B')
 
-        # Iternate over the layers
+        # Iterate over the layers
         num_layers_total = UV_A[0].shape[0] + UV_B[0].shape[0]
 
         n_fft_perms = np.log2(self.D)
@@ -850,10 +873,14 @@ class Diagonal(nn.Module):
 
         u = th.sin(theta/2)
         device = th.device('cuda' if X.is_cuda else 'cpu')
+        u = u.to(device)
+        X = X.to(device)
+        ampl = self.amp
+        ampl = ampl.to(device)
         Y = th.zeros(N, 2 * self.D_out).to(device)
         Y[:, :self.D_min] = u * X[:, :self.D_min]
         Y[:, self.D_out:self.D_out+self.D_min] = u * X[:, D:D+self.D_min]
-        return self.amp * Y
+        return ampl * Y
 
 """ Linear Modules """
 class Linear(nn.Module):
@@ -1056,7 +1083,20 @@ class ComplexLinear(nn.Module):
         else:
             return U
 
+'''
+Defines a complex convolution using sequential translation-invariant matrix multiplications.
+'''
 class ComplexConvolution(nn.Module):
+
+    '''
+    Constructor for the layer.
+
+    Inputs:
+        self: the layer
+        D_in: input dimension
+        filtersize: size of the convolutional filter
+        stepsize: stepsize of the filter
+    '''
     def __init__(self, D_in, filtersize, stepsize):
         super().__init__()
         self.D_in = D_in
@@ -1065,35 +1105,79 @@ class ComplexConvolution(nn.Module):
         self.stepsize = stepsize
         self.init_params()
 
+    '''
+    Initialize the Parameters used in the Layer
+    '''
     def init_params(self):
         #used to initialize to a unitary
         U_real, U_imag = ct.rand_unitary_separated(self.filtersize)
+
+        # parameterize the real and complex parts of the matrix
         self.U_real = Parameter(U_real)
         self.U_imag = Parameter(U_imag)
+
+        # find the total number of matrix multiplications required
         self.tot_num = ceil(self.filtersize/self.stepsize)
+
+        # find the effective empty size in each matrix multiplication
         self.size_one = self.tot_num*self.stepsize - self.filtersize
+
+        #find the effective step size in each matrix multiplication
         self.jump_size = self.filtersize + self.size_one
+
+        #find the total number of filters in each matrix multiplication
         self.tot_filters = self.D_in // (self.jump_size)
 
+    '''
+    Describe the weights in the convolution.
+
+    Outputs:
+        The real/imaginary parts of the filter
+    '''
     @property
     def weight(self):
         return self.U_real, self.U_imag
+
+    '''
+    Set the weights to a given value.
+
+    Inputs:
+        M: the value to set the weights to
+    '''
     def set_weight(self, M):
-        self.U_real.data = U[:self.D_in, :self.D_in]
-        self.U_imag.data = U[self.D_in:, :self.D_in]
+        self.U_real.data = M[:self.D_in, :self.D_in]
+        self.U_imag.data = M[self.D_in:, :self.D_in]
+
+    '''
+    Define a forward timestep through the Quantum Convolution.
+
+    Inputs:
+        X: the input state
+
+    Outputs:
+        The output state after running X through the quantum convolution.
+    '''
     def forward(self, X):
+        
+        # Define the overall matrix for multiplication
         M = th.eye(2*self.D_in)
         inter_real = th.eye(self.D_in)
         inter_imag = th.eye(self.D_in)
+
+        # Initialize the first matrix multiplication by superimposing the filters
         U_re, U_im = self.weight
         for i in range(self.tot_filters):
             inter_real[i*(self.jump_size): i*(self.jump_size) + self.filtersize, i*(self.jump_size): i*(self.jump_size) + self.filtersize] = U_re
             inter_imag[i*(self.jump_size): i*(self.jump_size) + self.filtersize, i*(self.jump_size): i*(self.jump_size) + self.filtersize] = U_im
+
+        # Find the size of the hanging matrix to create and initialize the hanging matrix
         if not (self.tot_filters*self.jump_size == self.D_in):
             leninter = min(self.D_in, self.tot_filters*self.jump_size + self.filtersize) - self.tot_filters*self.jump_size
             start = self.tot_filters*self.jump_size
             inter_real[start: start + leninter, start: start + leninter] = U_re[:leninter, :leninter]
             inter_imag[start: start + leninter, start: start + leninter] = U_im[:leninter, :leninter]
+
+        # For each matrix multiplication, multiply it to the overall matrix and shift by the step size to create the next multiplicative filter
         for i in range(self.tot_num):
             M = M@(ct.make_complex_matrix(inter_real, inter_imag))
             newinter_real = inter_real[:(self.D_in - self.stepsize), :(self.D_in - self.stepsize)]
@@ -1102,7 +1186,19 @@ class ComplexConvolution(nn.Module):
             inter_imag = th.eye(self.D_in)
             inter_real[self.stepsize:, self.stepsize:] = newinter_real
             inter_imag[self.stepsize:, self.stepsize:] = newinter_imag
+
+        # Define the final convolution as a linear transformation over the transformed convolutional filter
         return F.linear(X, M)
+
+    '''
+    Find the overall convolutional filter for the network.
+
+    Inputs:
+        numpy: whether to represent the data in a numpy format
+
+    Output:
+        The convolutional filter.
+    '''
     def get_M(self, numpy=True):
         U = self(th.eye(self.D_in * 2)).data.t()
         U_re = U[:self.filtersize, :self.filtersize]
@@ -1112,7 +1208,19 @@ class ComplexConvolution(nn.Module):
         else:
             return U
 """ Pooling """
+
+'''
+Define a translation invariant one dimensional average pooling for complex numbers.
+'''
 class AveragePooling(nn.Module):
+
+    '''
+    Constructor for the layer.
+
+    Inputs:
+        kernel_size: Size of the pooling sliding window
+        stride: The stepsize of the sliding window (initialized to kernel size if no input provided)
+    '''
     def __init__(self, kernel_size, stride = None):
         super().__init__()
         self.kernel_size = kernel_size
@@ -1121,19 +1229,44 @@ class AveragePooling(nn.Module):
         else:
             self.stride = stride
 
+    '''
+    Run one time-step through the pooling layer, pooling the real/imaginary parts separately.
+
+    Inputs:
+        Z: The matrix to run through pooling
+
+    Outputs:
+        The pooled matrix
+    '''
     def forward(self, Z):
         _, D = Z.shape
         assert D % 2 == 0
+
+        # Isolate real/imaginary parts
         X = Z[:, :D//2]
         Y = Z[:, D//2:]
         b = list(X.shape)[0]
         X = th.unsqueeze(X, 0)
         Y = th.unsqueeze(Y, 0)
+
+        # Pool real/imaginary parts separately
         A = th.squeeze(th.cat((F.avg_pool1d(X, kernel_size = self.kernel_size, stride = self.stride), F.avg_pool1d(Y, kernel_size = self.kernel_size, stride = self.stride)), 2))
         if b == 1:
             A = th.unsqueeze(A, 0)
         return A
+
+'''
+Define a translation invariant one dimensional max pooling for complex numbers.
+'''
 class MaxPooling(nn.Module):
+
+    '''
+    Constructor for the layer.
+
+    Inputs:
+        kernel_size: Size of the pooling sliding window
+        stride: The stepsize of the sliding window (initialized to kernel size if no input provided)
+    '''
     def __init__(self, kernel_size, stride = None):
         super().__init__()
         self.kernel_size = kernel_size
@@ -1142,18 +1275,33 @@ class MaxPooling(nn.Module):
         else:
             self.stride = stride
 
+    '''
+    Run one time-step through the pooling layer, pooling the real/imaginary parts separately.
+
+    Inputs:
+        Z: The matrix to run through pooling
+
+    Outputs:
+        The pooled matrix
+    '''
     def forward(self, Z):
         _, D = Z.shape
         assert D % 2 == 0
+
+        # Isolate real/imaginary parts
         X = Z[:, :D//2]
         Y = Z[:, D//2:]
         b = list(X.shape)[0]
         X = th.unsqueeze(X, 0)
         Y = th.unsqueeze(Y, 0)
+
+        # Pool real/imaginary parts separately
         A = th.squeeze(th.cat((F.max_pool1d(X, kernel_size = self.kernel_size, stride = self.stride), F.max_pool1d(Y, kernel_size = self.kernel_size, stride = self.stride)), 2))
         if b == 1:
             A = th.unsqueeze(A, 0)
         return A
+
+
 """ Nonlinearities """
 class ModNonlinearity(nn.Module):
     def __init__(self, f=None):
@@ -1198,12 +1346,34 @@ class ShiftedSoftplus(nn.Module):
         return 0.5 * (F.softplus(2 * (X - self.u0)) - log(1 + exp(-2*self.u0)))
 
 
+'''
+Defines a quantum-compatible sinusoidal nonlinearity x -> x*sin(T*x)
+'''
 class SineModulator(nn.Module):
+
+    '''
+    Constructor for the layer
+
+    Inputs:
+        T: the scale factor of the nonlinearity
+    '''
     def __init__(self, T):
         super().__init__()
         self.T = T
+
+    '''
+    Run a matrix through the nonlinearity x -> x*sin(T*x)
+
+    Inputs:
+        X: the matrix to process
+
+    Outputs:
+        The matrix after nonlinearities
+    '''
     def forward(self, X):
         return X* (th.sin(self.T*(X)))
+
+
 """ Other """
 class NoisySequential(nn.Sequential):
     def __init__(self, *layers):

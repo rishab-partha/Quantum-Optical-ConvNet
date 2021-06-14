@@ -1,3 +1,9 @@
+'''
+A file that stores the default file/folder names for different models. Based on the public codebase at https://github.com/mike-fang/imprecise_optical_neural_network.
+
+@version 3.8.2021
+'''
+
 import os
 import numpy as np
 # Default file paths
