@@ -1054,7 +1054,7 @@ class ComplexLinear(nn.Module):
         self.M_imag = Parameter(M[self.D_out:, :self.D_in])
 
         if self.has_bias:
-            self.bias = Parameter(th.Tensor(D_out*2))
+            self.bias = Parameter(th.Tensor(self.D_out*2))
             self.bias.data.uniform_(-sigma, sigma)
         else:
             self.register_parameter('bias', None)
