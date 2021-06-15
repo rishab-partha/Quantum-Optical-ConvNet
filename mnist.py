@@ -26,6 +26,7 @@ from itertools import cycle
 from sklearn.metrics import roc_curve, auc
 import math
 
+
 TEST_SIZE = 10_000
 BATCH_SIZE = 100
 USE_CUDA = False
@@ -60,7 +61,7 @@ X0 = data[82][None, :]
 N_IN = 28**2//2
 
 
-def train(model, n_epochs, log_interval, optim_params, batch_size=10, criterion=nn.NLLLoss(), device=DEVICE, epoch_callback=None, log_callback=None):
+def train(model, n_epochs, log_interval, optim_params, batch_size=10, criterion=nn.NLLLoss(), device=DEVICE, epoch_callback=None, log_callback=None, writer=None, iteration=0):
     loader = mnist_loader(train=True, batch_size=batch_size)
     optimizer = optim.SGD(model.parameters(), **optim_params)
     #criterion = nn.NLLLoss()
@@ -83,12 +84,17 @@ def train(model, n_epochs, log_interval, optim_params, batch_size=10, criterion=
                 #acc = get_acc(model, device)
                 out = model(data)
                 print(f'Epoch: {epoch}, Train loss: {loss.float():.4f}, Train acc: {acc:.4f}, Time/it: {t/log_interval * 1e3:.4f} ms')
+                if not writer is None:
+                    print(n_epochs*iteration*60000/batch_size + epoch*60000/batch_size + batch_idx)
+                    writer.add_scalar('training loss', loss.float(), n_epochs*iteration*60000/batch_size + epoch*60000/batch_size + batch_idx)
+                    writer.add_scalar('training accuracy', acc, n_epochs*iteration*60000/batch_size + epoch*60000/batch_size + batch_idx)
                 if log_callback:
                     log_callback(model, epoch)
         if epoch_callback:
             epoch_callback(model, epoch)
         print("EpochTime:" + str(time() - tx))
         tx = time()
+
 def get_acc(model, device=DEVICE):
     confusion = None
     with th.no_grad():

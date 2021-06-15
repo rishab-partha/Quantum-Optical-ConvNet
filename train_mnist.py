@@ -28,6 +28,11 @@ from glob import glob
 print(10)
 from default_params import *
 print(11)
+from torch.utils.tensorboard import SummaryWriter
+
+writer = SummaryWriter('runs/complexnet')
+print("writer created")
+
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -48,7 +53,7 @@ def train_complex(f=F_COMPLEX_TRAIN, n_h=[256, 256]):
     # Define training parameters
     train_params = {}
     train_params['n_epochs'] = 5
-    train_params['log_interval'] = 100
+    train_params['log_interval'] = 10
     train_params['batch_size'] = 100
 
     # Define optimization parameters
@@ -61,14 +66,14 @@ def train_complex(f=F_COMPLEX_TRAIN, n_h=[256, 256]):
     print(net)
 
     # Train for 10 epochs, slashing learning rate after 5
-    train(net, **train_params, optim_params=optim_params)
+    train(net, **train_params, optim_params=optim_params, writer=writer)
     optim_params['lr'] /= 5
 
-    train(net, **train_params, optim_params=optim_params)
+    train(net, **train_params, optim_params=optim_params, writer=writer, iteration = 1)
     acc = get_acc(net)
 
     print(f'Trained ComplexNet with accuracy {acc}.')
-
+    writer.close()
     # Save model
     if f:
         th.save(net.state_dict(), f)

@@ -9,11 +9,15 @@ import numpy as np
 import glob
 import cv2
 import warnings
+from torch.utils.tensorboard import SummaryWriter
+
+writer = SummaryWriter('runs/cnn')
+print("writer created")
 
 warnings.filterwarnings("ignore")
 
 n_epochs = 10
-batch_size_train = 64
+batch_size_train = 100
 batch_size_test = 1000
 learning_rate = 0.0004
 momentum = 0.9
@@ -82,13 +86,10 @@ def train(epoch):
     network.train()
 
     # Split Batch Sizes
-    for batch_idx in range(938):
-      if batch_idx < 937:
-        data = datum[batch_idx*64:batch_idx*64+64].reshape(64, 1, 28, 28)
-        target = labels[batch_idx*64:batch_idx*64+64].values
-      else:
-        data = datum[59968:60000].reshape(32, 1, 28, 28)
-        target = labels[59968:60000].values
+    for batch_idx in range(600):
+      batch_size = 100
+      data = datum[batch_idx*100:batch_idx*100+100].reshape(100, 1, 28, 28)
+      target = labels[batch_idx*100:batch_idx*100+100].values
       data = torch.from_numpy(data)
       target = torch.from_numpy(target)
     #for batch_idx, (data, target) in enumerate(train_loader):
@@ -101,13 +102,20 @@ def train(epoch):
       optimizer.step()
 
       # Print batch interval
-      if batch_idx % log_interval == 0:
-        print('Train Epoch: {} [{}/{} ({:.2f}%)]\tLoss: {:.6f}'.format(
+      if batch_idx % log_interval == 0 and batch_idx != 0:
+        print('Train Epoch: {} [{}/{} ({:.2f}%)]\t Loss: {:.6f}'.format(
             epoch, batch_idx * len(data), 60000,
-            batch_idx / 9.375, loss.item()))
+            batch_idx / 6.0000, loss.item()))
+        index = (epoch - 1)*600 + batch_idx
+        writer.add_scalar('training loss', loss.item(), index)
+        pred = output.data.max(1, keepdim=True)[1]
+        correct = pred.eq(target.data.view_as(pred)).sum()
+        acc = correct / batch_size
+
+        writer.add_scalar('training accuracy', acc, index)
         train_losses.append(loss.item())
         train_counter.append(
-            (batch_idx*64) + ((epoch-1)*60000))
+            (batch_idx*100) + ((epoch-1)*60000))
         #torch.save(network.state_dict(), '/results/model.pth')
         #torch.save(optimizer.state_dict(), '/results/optimizer.pth')
 
@@ -157,6 +165,7 @@ for epoch in range(1, n_epochs + 1):
   train(epoch)
   confusion = test()
 
+writer.close()
 print(confusion)
 
 newFile = open('Data/CNN Data.txt', 'w')
