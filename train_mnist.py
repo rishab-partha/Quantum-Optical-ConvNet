@@ -30,7 +30,7 @@ from default_params import *
 print(11)
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter('runs/complexnet')
+writer = SummaryWriter('runs/QONN')
 print("writer created")
 
 

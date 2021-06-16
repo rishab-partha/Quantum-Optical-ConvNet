@@ -13,7 +13,7 @@ DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 # Trained Models
 DIR_TRAINED_MODELS = os.path.join(DIR_PATH, 'trained_models')
 F_CNN_TRAIN = os.path.join(DIR_TRAINED_MODELS, 'cnn.pth')
-F_COMPLEX_TRAIN = os.path.join(DIR_TRAINED_MODELS, 'complex_net_traininggraph.pth')
+F_COMPLEX_TRAIN = os.path.join(DIR_TRAINED_MODELS, 'QONN_traininggraph.pth')
 F_CGRD_TRAIN = os.path.join(DIR_TRAINED_MODELS, 'cgrd.pth')
 F_GRID_TRAIN = os.path.join(DIR_TRAINED_MODELS, 'grid_net.pth')
 F_GRID_ORD_TRAIN = os.path.join(DIR_TRAINED_MODELS, 'grid_net_ordered_SV.pth')
