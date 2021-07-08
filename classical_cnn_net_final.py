@@ -11,7 +11,7 @@ import cv2
 import warnings
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter('runs/cnn')
+writer = SummaryWriter('extraruns/cnn')
 print("writer created")
 
 warnings.filterwarnings("ignore")
