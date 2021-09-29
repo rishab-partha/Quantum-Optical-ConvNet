@@ -217,7 +217,7 @@ Outputs:
     A QOCNN satisfying the above properties
 '''
 def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVICE, sigma=0, T0=0.2):
-    '''f = SineModulator(T=T0)
+    """ f = SineModulator(T=T0)
     layers = [
         ComplexConvolution(392, filtersize = 3, stepsize = 1),
         MaxPooling(kernel_size = 2, stride = 1),
@@ -233,8 +233,9 @@ def mnist_complex(num_in=N_IN, num_out=10, hidden_units=[256, 256], device=DEVIC
         ComplexLinear(hidden_units[-1], num_out),
         ComplexNorm(),
         nn.LogSoftmax(dim=1)
-        ])'''
-    f = SineModulator(T=T0)
+        ]) """
+    #f = SineModulator(T=T0)
+    f = ShiftedSoftplus(T=0.03)
     layers = [
         ComplexLinear(num_in, hidden_units[0]),
         ModNonlinearity(f=f)

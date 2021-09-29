@@ -9,10 +9,11 @@ import numpy as np
 import glob
 import cv2
 import warnings
+from default_params import *
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter('extraruns/cnn')
-print("writer created")
+#writer = SummaryWriter('extraruns/cnn')
+#print("writer created")
 
 warnings.filterwarnings("ignore")
 
@@ -107,12 +108,12 @@ def train(epoch):
             epoch, batch_idx * len(data), 60000,
             batch_idx / 6.0000, loss.item()))
         index = (epoch - 1)*600 + batch_idx
-        writer.add_scalar('training loss', loss.item(), index)
+        #writer.add_scalar('training loss', loss.item(), index)
         pred = output.data.max(1, keepdim=True)[1]
         correct = pred.eq(target.data.view_as(pred)).sum()
         acc = correct / batch_size
 
-        writer.add_scalar('training accuracy', acc, index)
+        #writer.add_scalar('training accuracy', acc, index)
         train_losses.append(loss.item())
         train_counter.append(
             (batch_idx*100) + ((epoch-1)*60000))
@@ -165,12 +166,12 @@ for epoch in range(1, n_epochs + 1):
   train(epoch)
   confusion = test()
 
-writer.close()
+#writer.close()
 print(confusion)
 
 newFile = open('Data/CNN Data.txt', 'w')
 newFile.write(str(confusion))
-
+torch.save(network.state_dict(), F_CNN_TRAIN)
 # Make plots
 fig = plt.figure()
 plt.plot(train_counter, train_losses, color='blue')
