@@ -39,6 +39,7 @@ else:
 
 
 # Define loader
+'''
 def mnist_loader(train=True, batch_size=BATCH_SIZE, shuffle=True):
     loader =  th.utils.data.DataLoader(
             datasets.MNIST('../data', train=train, download=True, 
@@ -48,17 +49,24 @@ def mnist_loader(train=True, batch_size=BATCH_SIZE, shuffle=True):
                 ])),
             batch_size=batch_size, shuffle=shuffle)
     return loader
+'''
+data_dir = "../input/"
+
+# Define loader
+def mnist_loader(train=True, batch_size=BATCH_SIZE, shuffle=True, data_dir = "../input/"):
+    loader =  datasets.ImageFolder(data_dir, transform=data_transforms["train_transforms"])#loading dataset
+    return loader
 
 # Get X for testing
 for data, target in mnist_loader(train=False, batch_size=100, shuffle=False):
     continue
-data = data.view(-1, 28**2)
+data = data.view(-1, 256**2)
 data, target = data.to(DEVICE), target.to(DEVICE)
 X0 = data[82][None, :]
 
 
 # Network dims
-N_IN = 28**2//2
+N_IN = 256**2//2
 
 
 def train(model, n_epochs, log_interval, optim_params, batch_size=10, criterion=nn.NLLLoss(), device=DEVICE, epoch_callback=None, log_callback=None, writer=None, iteration=0):
